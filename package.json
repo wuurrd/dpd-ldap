@@ -1,0 +1,17 @@
+{
+  "name": "dpd-ldap",
+  "version": "0.0.1",
+  "description": "Deployd module to create users with ldap users",
+  "main": "index.js",
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/wuurrd/dpd-ldap.git"
+  },
+  "author": "David Buchmann",
+  "license": "MIT",
+  "dependencies": {
+    "ldapjs"   :  "0.7.0",
+    "validation": "*",
+    "debug": ">= 0.7.0"
+  }
+}
