@@ -1,4 +1,5 @@
 var ldap = require('ldapjs')
+  , ldap_login = require('./ldap')
   , validation = require('validation')
   , util = require('util')
   , Collection = require('deployd/lib/resources/collection')
@@ -104,22 +105,26 @@ LDAPUserCollection.prototype.handle = function (ctx) {
         debug('trying to login as %s', credentials.username);
 
         this.store.first({username: credentials.username}, function(err, user) {
-          // User does not exist. Do an LDAP query.
-          if(err) return this.ldapLogin(ctx);
+          if(err) return ctx.done(err);
 
           if(user) {
             var salt = user.password.substr(0, SALT_LEN)
               , hash = user.password.substr(SALT_LEN);
 
+            debug('User found, comparing hashes');
             if(hash === uc.hash(credentials.password, salt)) {
               debug('logged in as %s', credentials.username);
               ctx.session.set({path: path, uid: user.id}).save(ctx.done);
               return;
             }
+            else {
+              ctx.res.statusCode = 401;
+              return ctx.done('bad credentials');
+            }
           }
-
-          ctx.res.statusCode = 401;
-          ctx.done('bad credentials');
+          else {
+            return uc.ldapLogin(ctx, uc, path);
+          }
         });
         break;
       }
@@ -156,21 +161,34 @@ LDAPUserCollection.prototype.handle = function (ctx) {
   }
 };
 
-LDAPUserCollection.prototype.ldapLogin = function (ctx) {
-  this.client.bind(ctx.body.username, ctx.body.password, function (err, res) {
-    if (err) return ctx.done(err);
-    client.unbind();
+LDAPUserCollection.prototype.ldapLogin = function (ctx, uc, path) {
+  debug('LDAP Login called', uc.config.ldapUrl);
+  function addUser() {
     var salt = uuid.create(SALT_LEN);
-    ctx.body.password = salt + this.hash(ctx.body.password, salt);
+    ctx.body.password = salt + uc.hash(ctx.body.password, salt);
     function done(err, user) {
-      if (user) delete user.password;
-      ctx.session.set({path: path, uid: user.id}).save(ctx.done);
+      if (user) {
+        ctx.session.set({path: path, uid: user.id}).save(ctx.done);
+        return;
+      }
+      return ctx.done(err);
     }
-    return this.save(ctx, done);
+    // If query id is set - save will do a put rather than a post.
+    ctx.query.id = null;
+    return uc.save(ctx, done);
+  }
+  ldap_login(uc.client, ctx.body.username, ctx.body.password, function (authenticated) {
+    if (!authenticated) {
+      ctx.res.statusCode = 401;
+      return ctx.done('bad credentials');
+    }
+    else {
+      addUser();
+    }
   });
 };
 
-LDAPUserCollection.prototype.handleSession = function (ctx, fn) {
+  LDAPUserCollection.prototype.handleSession = function (ctx, fn) {
   // called when any session has been created
   var session = ctx.session
     , path = this.path;
