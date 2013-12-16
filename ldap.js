@@ -10,6 +10,7 @@ function ldap_login(client, username, password, cb) {
         client.unbind();
         return cb(false);
       }
+      // Workaround ldapjs bug
       client.search(
         'dc=example, dc=com',
         { scope: 'sub', filter: 'sAMAccountName=:user' },
