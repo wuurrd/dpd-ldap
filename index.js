@@ -32,7 +32,6 @@ function LDAPUserCollection(name, options) {
   // username is required
   this.properties.username = this.properties.username || {type: 'string'};
   this.properties.username.required = true;
-  this.client = ldap.createClient({url: this.config.ldapUrl});
 }
 
 util.inherits(LDAPUserCollection, Collection);
@@ -114,6 +113,8 @@ LDAPUserCollection.prototype.handle = function (ctx) {
 
 LDAPUserCollection.prototype.ldapLogin = function (ctx, uc, path) {
   debug('LDAP Login called', uc.config.ldapUrl);
+  client = ldap.createClient({url: uc.config.ldapUrl});
+
   function addUser() {
     function done(err, user) {
       if (user) {
@@ -126,7 +127,7 @@ LDAPUserCollection.prototype.ldapLogin = function (ctx, uc, path) {
     ctx.query.id = null;
     return uc.save(ctx, done);
   }
-  ldap_login(uc.client, ctx.body.username, ctx.body.password, function (authenticated) {
+  ldap_login(client, ctx.body.username, ctx.body.password, function (authenticated) {
     if (!authenticated) {
       ctx.res.statusCode = 401;
       return ctx.done('bad credentials');
